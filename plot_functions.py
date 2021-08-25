@@ -192,10 +192,69 @@ class multiline_plot(paperfigure):
                 pass
         ### switch on grid for line plots
         self.ax.grid(True)
+        
+def slider_plot(fun, x_data=None, y_data=None,p_names=None,p_min_max_steps_dict=None,
+                          const_params=[]):
+    from matplotlib.widgets import Slider, Button
+        
+    fig, ax = plt.subplots()
+    plt.subplots_adjust(left=0.15, bottom=0.4)
+    
+    p_list=[]
+    for key in p_names:
+        min_val,max_val,steps=p_min_max_steps_dict[key]
+        p_list.append((max_val+min_val)/2)
+   
+    func_vals=fun(x_data,*p_list)
+    plt.plot(x_data,y_data,color='blue')
+    l, = plt.plot(x_data, func_vals,color='black', lw=2)
+    ax.margins(x=0)
+    
+    axcolor = 'lightgoldenrodyellow'
+    
+    slider_ax_dict={}
+    slider_dict={}
+    h_max=0.35
+    h_min=0.1
+    h_step=(h_max-h_min)/(len(p_min_max_steps_dict))
+    i=1
+    for key in p_min_max_steps_dict.keys():
+        
+        min_val,max_val,steps = p_min_max_steps_dict[key]
+        slider_ax_dict[key]=plt.axes([0.15, h_max-i*h_step, 0.65, h_step*0.7], facecolor=axcolor)
+        slider_ax_dict[key].set_xlim(min_val,max_val)
+        slider_dict[key]=Slider(slider_ax_dict[key],key,min_val,max_val,
+                                valinit=(max_val+min_val)/2)
+        i+=1
+    
+    
+    def update(val):
+        
+        p_list=[]
+        for key in p_names:
+            p_list.append(slider_dict[key].val)
+        print(p_list)
+        l.set_ydata(fun(x_data,*p_list))
+        fig.canvas.draw_idle()
+    
+    ## connect sliders to update function
+    for key in slider_ax_dict.keys():
+        slider_dict[key].on_changed(update)
+    
+    resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
+    button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
+    
+    
+    def reset(event):
+        for key in slider_dict.keys():
+            slider_dict[key].reset()
+    button.on_clicked(reset)
+    
+    plt.show()
     
 if __name__ == '__main__':
     
-    test_colorplot=True
+    test_colorplot=False
     if(test_colorplot):
         ## make list of lists for colorplot testing:
             
@@ -232,3 +291,19 @@ if __name__ == '__main__':
         
         cplot_halfcolumn=multiline_plot(xdata,ydata,cdata,xlabel=r'$x$',ylabel=r'$y$',width_in_cols=0.5)
         cplot_onecolumn=multiline_plot(xdata,ydata,cdata,xlabel=r'$x$',ylabel=r'$y$',width_in_cols=1)
+        
+    test_slider_plot=True
+    if test_slider_plot:
+        def fun(x,a,b,c):
+            ret=a*np.sin(b*x)*np.exp(c*x)
+            return(ret)
+            
+        xdata=np.linspace(0,10,200)
+        ydata=fun(xdata,1,5,-0.2)
+        noise=np.random.normal(scale=0.2,size=200)
+        ysim=ydata+noise
+        
+        slider_plot(fun,xdata,ysim,p_names=['a','b','c'],
+                                         p_min_max_steps_dict={'a':[0,2,40],'b':[0,10,40],'c':[-1,1,40]})
+        
+    

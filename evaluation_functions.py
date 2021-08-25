@@ -209,6 +209,7 @@ def brute_leastsquare_fit(fun, x_data, y_data,p_names=None,p_min_max_steps_dict=
         plt.figure()
         plt.plot(x_data,y_data,label='data',color='blue')
         plt.plot(x_data,fun(x_data,*arg_list),label='Fit',color='red')
+        plt.title(best_result.params.valuesdict())
         plt.show()
     return (arg_list[0:len(p_names)])
      
@@ -298,7 +299,7 @@ if __name__=='__main__':
         df['fitted_function']=fun(df['x_data'],*arg_list)
         df.plot('x_data')
     
-    test_stitchSpectra=True
+    test_stitchSpectra=False
     plt.figure()
     if test_stitchSpectra:
         lamb_list=[]
@@ -314,6 +315,8 @@ if __name__=='__main__':
         plt.xlabel('stitched lamb')
         plt.ylabel('stitched spectra')
         plt.show()
-    
+        
+        
+   
     
     
