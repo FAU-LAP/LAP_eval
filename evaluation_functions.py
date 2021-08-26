@@ -149,6 +149,46 @@ def plot_brute_leastsquares_results(result, best_vals=True, varlabels=None,
         plt.show()
    
 
+def leastsq_fit(fun, x_data, y_data,p_names=None,p0_dict=None,weight_data=None,p_min_max_steps_dict=None,const_params=[]):
+    
+    ''' A wrapper around the leastsq fit from LMFIT
+    fun is a function of the form fun(x_data,p0,p1,p2,...)
+    '''
+    
+    params = Parameters() ### initialize LMfit parameters
+    for p_name in p_names:
+        min_val=p_min_max_steps_dict[p_name][0]
+        max_val=p_min_max_steps_dict[p_name][1]
+        steps=p_min_max_steps_dict[p_name][2]
+        if p0_dict is not None: 
+            value=p0_dict[p_name]
+        params.add(p_name,value=min_val,
+                   min=value,
+                   max=max_val)#,
+                   #brute_step=(max_val-min_val)/(steps-1))
+    
+    def minimize_fun(pars):
+        print(pars)
+        v=pars.valuesdict()
+        arglist=[]
+        for p_name in p_names:
+            arglist.append(v[p_name])
+        
+        for const_param in const_params:
+            arglist.append(const_param)
+        
+        ret=np.array((fun(x_data,*arglist)-y_data),dtype=float)
+        if weight_data is not None:
+            ret=ret*np.sqrt(weight_data)
+        return(ret)
+    conv=1E-18
+    result = lmfit.minimize(minimize_fun, params=params,method='leastsq',nan_policy='omit',xtol=conv,ftol=conv,max_nfev=1000)
+    print(lmfit.fit_report(result))
+    arg_list=[]
+    for p_name in p_names:
+        arg_list.append(result.params.valuesdict()[p_name])
+    
+    return(arg_list)
 
 def brute_leastsquare_fit(fun, x_data, y_data,weight_data=None,p_names=None,p_min_max_steps_dict=None,
                           const_params=[], visualize=False):

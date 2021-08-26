@@ -194,132 +194,191 @@ class multiline_plot(paperfigure):
         ### switch on grid for line plots
         self.ax.grid(True)
         
-def slider_plot(fun, x_data=None, y_data=None,p_names=None,p_min_max_steps_dict=None,
+class slider_plot:   
+    def __init__(self,fun, x_data=None, y_data=None,p_names=None,p_min_max_steps_dict=None,
                           const_params=[]):
-    ### takes 
-    
-    if type(x_data) is pd.core.series.Series:
-        print('reset x_plot,y_plot')
-        x_name=x_data.name
-        x_plot=x_data.reset_index()[x_name][1]
         
-        y_name=y_data.name
-        y_plot=y_data.reset_index()[y_name][1]
+        from matplotlib.widgets import Slider, Button
+        try: 
+            from LAP_eval import evaluation_functions as eval_func
+        except:
+            import evaluation_functions as eval_func
+        ### takes 
+        self.x_data=x_data
+        self.y_data=y_data
+        if type(x_data) is pd.core.series.Series:
+            print('reset self.x_plot,self.y_plot')
+            x_name=x_data.name
+            self.x_plot=x_data.reset_index()[x_name][1]
+            
+            y_name=y_data.name
+            self.y_plot=y_data.reset_index()[y_name][1]
+            
+            print('xlen,ylen:',len(self.x_plot),len(self.y_plot))
+            
+        else:
+            self.x_plot=x_data
+            self.y_plot=y_data
         
-        print('xlen,ylen:',len(x_plot),len(y_plot))
         
-    else:
-        x_plot=x_data
-        y_plot=y_data
-    
-    
-    
-    
-    from matplotlib.widgets import Slider, Button
-        
-    fig, ax = plt.subplots()
-    plt.subplots_adjust(left=0.15, bottom=0.4)
-    
-    p_list=[]
-    for key in p_names:
-        min_val,max_val,steps=p_min_max_steps_dict[key]
-        p_list.append((max_val+min_val)/2)
-   
-    func_vals=fun(x_plot,*p_list)
-    data_line, = plt.plot(x_plot,y_plot,color='blue')
-    func_line, = plt.plot(x_plot, func_vals,color='black', lw=2)
-    ax.margins(x=0)
-    
-    axcolor = 'lightgoldenrodyellow'
-    
-    slider_ax_dict={}
-    slider_dict={}
-    h_max=0.35
-    h_min=0.1
-    h_step=(h_max-h_min)/(len(p_min_max_steps_dict))
-    i=1
-    for key in p_min_max_steps_dict.keys():
-        
-        min_val,max_val,steps = p_min_max_steps_dict[key]
-        slider_ax_dict[key]=plt.axes([0.15, h_max-i*h_step, 0.65, h_step*0.7], facecolor=axcolor)
-        slider_ax_dict[key].set_xlim(min_val,max_val)
-        slider_dict[key]=Slider(slider_ax_dict[key],key,min_val,max_val,
-                                valinit=(max_val+min_val)/2)
-        i+=1
-    
-    
-    def update(val):
+        fig, ax = plt.subplots()
+        plt.subplots_adjust(left=0.15, bottom=0.4)
         
         p_list=[]
         for key in p_names:
-            p_list.append(slider_dict[key].val)
-        print(p_list)
-        func_line.set_ydata(fun(x_plot,*p_list))
-        fig.canvas.draw_idle()
-    
-    ## connect sliders to update function
-    for key in slider_ax_dict.keys():
-        slider_dict[key].on_changed(update)
-    
-    resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
-    button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
-    
-    
-    def reset(event):
-        for key in slider_dict.keys():
-            slider_dict[key].reset()
-    button.on_clicked(reset)
-    
-    
-    ## extra functions if dataframe or list is given to function
-    if type(y_data)==pd.core.series.Series:
-        y_series=y_data
-        print('ydata type is pandas Series, initialize further functions')
-        ## reset width of parameter axes
+            min_val,max_val,steps=p_min_max_steps_dict[key]
+            p_list.append((max_val+min_val)/2)
+       
+        func_vals=fun(self.x_plot,*p_list)
+        data_line, = plt.plot(self.x_plot,self.y_plot,color='blue')
+        func_line, = plt.plot(self.x_plot, func_vals,color='black', lw=2)
+        ax.margins(x=0)
+        
+        axcolor = 'lightgoldenrodyellow'
+        
+        slider_ax_dict={}
+        slider_dict={}
+        h_max=0.35
+        h_min=0.1
+        h_step=(h_max-h_min)/(len(p_min_max_steps_dict))
         i=1
         for key in p_min_max_steps_dict.keys():
-            slider_ax_dict[key].set_position([0.15, h_max-i*h_step, 0.3, h_step*0.7])
-            i+=1
-        
-        ## initialize index sliders
-        print(y_data.index.names)
-        index_slider_dict={}
-        index_slider_ax_dict={}
-        i=1
-        for iname in y_data.index.names:
             
-            min_val,max_val = np.min(y_data.reset_index()[iname]),np.max(y_data.reset_index()[iname])
-            index_slider_ax_dict[iname]=plt.axes([0.6, h_max-i*h_step, 0.3, h_step*0.7], facecolor=axcolor)
-            index_slider_ax_dict[iname].set_xlim(min_val,max_val)
-            index_slider_dict[iname]=Slider(index_slider_ax_dict[iname],iname,min_val,max_val,
+            min_val,max_val,steps = p_min_max_steps_dict[key]
+            slider_ax_dict[key]=plt.axes([0.15, h_max-i*h_step, 0.65, h_step*0.7], facecolor=axcolor)
+            slider_ax_dict[key].set_xlim(min_val,max_val)
+            slider_dict[key]=Slider(slider_ax_dict[key],key,min_val,max_val,
                                     valinit=(max_val+min_val)/2)
             i+=1
+        
+        
+        def update(val):
             
-        def update_index(val):
-            
-            def find_nearest(array, value):
-                array = np.asarray(array)
-                idx = (np.abs(array - value)).argmin()
-                return array[idx]
-            
-            index_list=[]
-            for iname in y_data.index.names:
-                index=find_nearest(y_data.reset_index()[iname],index_slider_dict[iname].val)
-                index_list.append(index)
-            
-            x_plot=x_data[tuple(index_list)]
-            y_plot=y_data[tuple(index_list)]
-            
-            data_line.set_xdata(x_plot)
-            data_line.set_ydata(y_plot)
-                 
+            p_list=[]
+            for key in p_names:
+                p_list.append(slider_dict[key].val)
+            print(p_list)
+            func_line.set_ydata(fun(self.x_plot,*p_list))
             fig.canvas.draw_idle()
+        
+        ## connect sliders to update function
+        for key in slider_ax_dict.keys():
+            slider_dict[key].on_changed(update)
+    
+        
+        ## extra functions if dataframe or list is given to function
+        if type(y_data)==pd.core.series.Series:
+            y_series=y_data
+            print('ydata type is pandas Series, initialize further functions')
+            ## reset width of parameter axes
+            i=1
+            for key in p_min_max_steps_dict.keys():
+                slider_ax_dict[key].set_position([0.15, h_max-i*h_step, 0.3, h_step*0.7])
+                i+=1
+            
+            ## initialize index sliders
+            print(y_data.index.names)
+            index_slider_dict={}
+            index_slider_ax_dict={}
+            i=1
+            for iname in y_data.index.names:
                 
-        for iname in y_data.index.names:
+                min_val,max_val = np.min(y_data.reset_index()[iname]),np.max(y_data.reset_index()[iname])
+                index_slider_ax_dict[iname]=plt.axes([0.6, h_max-i*h_step, 0.3, h_step*0.7], facecolor=axcolor)
+                index_slider_ax_dict[iname].set_xlim(min_val,max_val)
+                index_slider_dict[iname]=Slider(index_slider_ax_dict[iname],iname,min_val,max_val,
+                                        valinit=(max_val+min_val)/2)
+                i+=1
+                
+            def update_index(val):
+                
+                def find_nearest(array, value):
+                    array = np.asarray(array)
+                    idx = (np.abs(array - value)).argmin()
+                    return array[idx]
+                
+                index_list=[]
+                for iname in y_data.index.names:
+                    index=find_nearest(y_data.reset_index()[iname],index_slider_dict[iname].val)
+                    index_list.append(index)
+                
+                self.x_plot=x_data[tuple(index_list)]
+                self.y_plot=y_data[tuple(index_list)]
+                
+                data_line.set_xdata(self.x_plot)
+                data_line.set_ydata(self.y_plot)
+                     
+                fig.canvas.draw_idle()
+                    
+            for iname in y_data.index.names:
+            
+                index_slider_dict[iname].on_changed(update_index)
+                
+        ## create reset button
         
-            index_slider_dict[iname].on_changed(update_index)
+        resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
+        button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
         
-    plt.show()
+        
+        def reset(event):
+            for key in slider_dict.keys():
+                slider_dict[key].reset()
+        button.on_clicked(reset)
+        
+        ## create leastsq_fit button
+        
+        leastsq_fit_ax = plt.axes([0.6, 0.025, 0.15, 0.04])
+        leastsq_fit_button = Button(leastsq_fit_ax, 'leastsq fit', color=axcolor, hovercolor='0.975')
+        
+        def leastsq_fit_action(event):
+            p0_dict={}
+            for key in p_names:
+                p0_dict[key]=slider_dict[key].val
+            
+            
+            p_list=eval_func.leastsq_fit(fun, self.x_plot, self.y_plot,
+                                         p_names=p_names,
+                                         p0_dict=p0_dict,
+                                         weight_data=None,
+                                         p_min_max_steps_dict=p_min_max_steps_dict,
+                                         const_params=[])
+            print(p_list)
+            func_line.set_ydata(fun(self.x_plot,*p_list))
+            
+            for i in range(len(p_list)):
+                slider_dict[p_names[i]].set_val(p_list[i])
+            
+            
+        leastsq_fit_button.on_clicked(leastsq_fit_action)
+        
+        ## create brute-lsq_fit button
+        
+        brute_lsq_fit_ax = plt.axes([0.4, 0.025, 0.15, 0.04])
+        brute_lsq_fit_button = Button(brute_lsq_fit_ax, 'brute_lsq fit', color=axcolor, hovercolor='0.975')
+        
+        def bute_lsq_fit_action(event):
+            p0_dict={}
+            for key in p_names:
+                p0_dict[key]=slider_dict[key].val
+            
+            
+            p_list=eval_func.brute_leastsquare_fit(fun, self.x_plot, self.y_plot,
+                                         p_names=p_names,
+                                         weight_data=None,
+                                         p_min_max_steps_dict=p_min_max_steps_dict,
+                                         const_params=[])
+            print(p_list)
+            func_line.set_ydata(fun(self.x_plot,*p_list))
+            
+            for i in range(len(p_list)):
+                slider_dict[p_names[i]].set_val(p_list[i])
+            
+            
+        brute_lsq_fit_button.on_clicked(bute_lsq_fit_action)
+        
+            
+        plt.show()
+        
     
 if __name__ == '__main__':
     
