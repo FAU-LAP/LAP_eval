@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import pandas as pd
 
 ### TODO: typical figure sizes 
 ##- twocolumn paper: 3.375,3.375*3/4  (inches) or 8.57 cm , 8.57*3/4 cm
@@ -195,6 +196,25 @@ class multiline_plot(paperfigure):
         
 def slider_plot(fun, x_data=None, y_data=None,p_names=None,p_min_max_steps_dict=None,
                           const_params=[]):
+    ### takes 
+    
+    if type(x_data) is pd.core.series.Series:
+        print('reset x_plot,y_plot')
+        x_name=x_data.name
+        x_plot=x_data.reset_index()[x_name][1]
+        
+        y_name=y_data.name
+        y_plot=y_data.reset_index()[y_name][1]
+        
+        print('xlen,ylen:',len(x_plot),len(y_plot))
+        
+    else:
+        x_plot=x_data
+        y_plot=y_data
+    
+    
+    
+    
     from matplotlib.widgets import Slider, Button
         
     fig, ax = plt.subplots()
@@ -205,9 +225,9 @@ def slider_plot(fun, x_data=None, y_data=None,p_names=None,p_min_max_steps_dict=
         min_val,max_val,steps=p_min_max_steps_dict[key]
         p_list.append((max_val+min_val)/2)
    
-    func_vals=fun(x_data,*p_list)
-    plt.plot(x_data,y_data,color='blue')
-    l, = plt.plot(x_data, func_vals,color='black', lw=2)
+    func_vals=fun(x_plot,*p_list)
+    data_line, = plt.plot(x_plot,y_plot,color='blue')
+    func_line, = plt.plot(x_plot, func_vals,color='black', lw=2)
     ax.margins(x=0)
     
     axcolor = 'lightgoldenrodyellow'
@@ -234,7 +254,7 @@ def slider_plot(fun, x_data=None, y_data=None,p_names=None,p_min_max_steps_dict=
         for key in p_names:
             p_list.append(slider_dict[key].val)
         print(p_list)
-        l.set_ydata(fun(x_data,*p_list))
+        func_line.set_ydata(fun(x_plot,*p_list))
         fig.canvas.draw_idle()
     
     ## connect sliders to update function
@@ -250,6 +270,55 @@ def slider_plot(fun, x_data=None, y_data=None,p_names=None,p_min_max_steps_dict=
             slider_dict[key].reset()
     button.on_clicked(reset)
     
+    
+    ## extra functions if dataframe or list is given to function
+    if type(y_data)==pd.core.series.Series:
+        y_series=y_data
+        print('ydata type is pandas Series, initialize further functions')
+        ## reset width of parameter axes
+        i=1
+        for key in p_min_max_steps_dict.keys():
+            slider_ax_dict[key].set_position([0.15, h_max-i*h_step, 0.3, h_step*0.7])
+            i+=1
+        
+        ## initialize index sliders
+        print(y_data.index.names)
+        index_slider_dict={}
+        index_slider_ax_dict={}
+        i=1
+        for iname in y_data.index.names:
+            
+            min_val,max_val = np.min(y_data.reset_index()[iname]),np.max(y_data.reset_index()[iname])
+            index_slider_ax_dict[iname]=plt.axes([0.6, h_max-i*h_step, 0.3, h_step*0.7], facecolor=axcolor)
+            index_slider_ax_dict[iname].set_xlim(min_val,max_val)
+            index_slider_dict[iname]=Slider(index_slider_ax_dict[iname],iname,min_val,max_val,
+                                    valinit=(max_val+min_val)/2)
+            i+=1
+            
+        def update_index(val):
+            
+            def find_nearest(array, value):
+                array = np.asarray(array)
+                idx = (np.abs(array - value)).argmin()
+                return array[idx]
+            
+            index_list=[]
+            for iname in y_data.index.names:
+                index=find_nearest(y_data.reset_index()[iname],index_slider_dict[iname].val)
+                index_list.append(index)
+            
+            x_plot=x_data[tuple(index_list)]
+            y_plot=y_data[tuple(index_list)]
+            
+            data_line.set_xdata(x_plot)
+            data_line.set_ydata(y_plot)
+                 
+            fig.canvas.draw_idle()
+                
+        for iname in y_data.index.names:
+        
+            index_slider_dict[iname].on_changed(update_index)
+        
     plt.show()
     
 if __name__ == '__main__':
@@ -304,6 +373,36 @@ if __name__ == '__main__':
         ysim=ydata+noise
         
         slider_plot(fun,xdata,ysim,p_names=['a','b','c'],
+                                         p_min_max_steps_dict={'a':[0,2,40],'b':[0,10,40],'c':[-1,1,40]})
+        
+    test_slider_plot_with_df=False
+    if test_slider_plot_with_df:
+        def fun(x,a,b,c):
+            ret=a*np.sin(b*x)*np.exp(c*x)
+            return(ret)
+        
+        xdata_list=[]
+        ydata_list=[]
+        v_list=[]
+        w_list=[]
+        
+        
+        ## initialize a test dataframe
+        for v in np.linspace(0,1):
+            for w in np.linspace(0,5):
+                v_list.append(v)
+                w_list.append(w)
+                xdata_list.append(np.linspace(0,10,200))
+                ydata=fun(xdata_list[-1],v,w,-0.2)
+                noise=np.random.normal(scale=0.2,size=200)
+                ydata=ydata+noise
+                ydata_list.append(ydata)
+        ysim=ydata+noise
+        
+        df=pd.DataFrame(zip(v_list,w_list,xdata_list,ydata_list),columns=['v','w','xdata','ydata'])
+        df.set_index(['v','w'],inplace=True)
+        
+        slider_plot(fun,df['xdata'],df['ydata'],p_names=['a','b','c'],
                                          p_min_max_steps_dict={'a':[0,2,40],'b':[0,10,40],'c':[-1,1,40]})
         
     

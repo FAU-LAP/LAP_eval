@@ -150,7 +150,7 @@ def plot_brute_leastsquares_results(result, best_vals=True, varlabels=None,
    
 
 
-def brute_leastsquare_fit(fun, x_data, y_data,p_names=None,p_min_max_steps_dict=None,
+def brute_leastsquare_fit(fun, x_data, y_data,weight_data=None,p_names=None,p_min_max_steps_dict=None,
                           const_params=[], visualize=False):
     
     """A very robust fit routine inspired from 
@@ -186,6 +186,8 @@ def brute_leastsquare_fit(fun, x_data, y_data,p_names=None,p_min_max_steps_dict=
                     arglist.append(const_param)
                 
                 ret=np.array((fun(x_data,*arglist)-y_data),dtype=float)
+                if weight_data is not None:
+                    ret=ret*np.sqrt(weight_data)
                 return(ret)
             brute_result=lmfit.minimize(minimize_fun,params,method='brute',nan_policy='omit')
             best_result=copy.deepcopy(brute_result)
@@ -282,7 +284,7 @@ def stitchSpectra(lamb_list,count_list, method="scale", edgeremove=(0, 0), shift
 
 if __name__=='__main__':
     ## generate some example data for fitting and testing routines 
-    test_brute_fit=False
+    test_brute_fit=True
     if test_brute_fit:
         def fun(x,a,b,c):
             ret=a*np.sin(b*x)*np.exp(c*x)

@@ -26,7 +26,7 @@ def Planck_lamb(lamb,A,T):
 
 
 def coupling(lamb_list,d,n_Au_list,n_SiC_list,E_0=1,
-             extra_imag_Au=0,extra_imag_SiC=-0.02,scatter_param=0.8):
+             extra_imag_Au=0,extra_imag_SiC=0.14,scatter_param=0.83):
     
     r_Au_list=ref_E(1,n_Au_list)
     r_Au_list = scatter_param*r_Au_list+extra_imag_Au*1j ## with correction for imperfect scattering and refelction phase
@@ -36,6 +36,6 @@ def coupling(lamb_list,d,n_Au_list,n_SiC_list,E_0=1,
     t_SiC_list = trans_E(n_SiC_list,1)+extra_imag_SiC*1j
     return n_SiC_list*np.abs(E_0*t_SiC_list*(1-1/r_SiC_list/(1-(1/((np.exp(2j*k*d)*r_Au_list*r_SiC_list))))))**2
 
-def thermal_radiation_mirror(lamb,d,A,T,n_Au,n_SiC,extra_imag_Au=0,extra_imag_SiC=-0.02,scatter_param=0.8):
+def thermal_radiation_mirror(lamb,d,A,T,n_Au,n_SiC,extra_imag_Au=0,extra_imag_SiC=0.14,scatter_param=0.83):
     return(Planck_lamb(lamb,A,T)*coupling(lamb,d,n_Au,n_SiC,E_0=1,
                                           extra_imag_Au=extra_imag_Au,extra_imag_SiC=extra_imag_SiC,scatter_param=scatter_param))
