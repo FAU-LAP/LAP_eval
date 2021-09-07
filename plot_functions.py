@@ -22,7 +22,7 @@ class paperfigure:
     '''
     
     def __init__(self,width_in_cols=1,aspect_ratio=4/3,
-                 override_figsize=None):
+                 override_figsize=None,make_cbar=False):
         cm_to_in=0.3937
         self.width_in_cols=width_in_cols
         self.width=width_in_cols*8.6*cm_to_in   ## has to be in inch for matplotlib
@@ -60,6 +60,14 @@ class paperfigure:
         
         self.fig, self.ax =plt.subplots(figsize=(self.width,self.width/self.aspect_ratio))
         
+        ### re-create fig and ax for inclusion of colorbar:
+        if make_cbar:
+            heights=[0.05,1]
+            self.fig, (self.ax_cbar,self.ax) =plt.subplots(nrows=2,ncols=1,
+                                                       figsize=(self.width,self.width/self.aspect_ratio),
+                                                       gridspec_kw={'height_ratios':heights})
+        
+        
 class colorplot(paperfigure):
     '''
     creates a colorplot using plt.scatter()
@@ -70,14 +78,8 @@ class colorplot(paperfigure):
                  xlabel=None,ylabel=None,clabel=None,cmap=cm.nipy_spectral,
                  vmin=None,vmax=None,make_cbar=True,cbar_pos='top',
                  **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(make_cbar=make_cbar,**kwargs)
         self.cmap=cmap
-        ### re-create fig and ax for inclusion of colorbar:
-        if make_cbar:
-            heights=[0.05,1]
-            self.fig, (self.ax_cbar,self.ax) =plt.subplots(nrows=2,ncols=1,
-                                                       figsize=(self.width,self.width/self.aspect_ratio),
-                                                       gridspec_kw={'height_ratios':heights})
         
         ### make list if only one line of x_data is given:
         if np.shape(x_data)==():
@@ -168,8 +170,9 @@ class multiline_plot(paperfigure):
     def __init__(self,x_data,y_data,c_data,
                  xlabel=None,ylabel=None,cmap=cm.plasma,
                  vmin=None,vmax=None,rel_vmin=1,rel_vmax=1,
+                 make_cbar=False,
                  **kwargs):
-        super().__init__(**kwargs) 
+        super().__init__(make_cbar=make_cbar,**kwargs) 
         self.cmap=cmap
         ### make list if only one line of x_data is given:
         if np.shape(x_data)==():
@@ -213,6 +216,7 @@ class multiline_plot(paperfigure):
         ### switch on grid for line plots
         self.ax.grid(True)
         
+       
 class slider_plot:   
     def __init__(self,fun, x_data=None, y_data=None,p_names=None,p_min_max_steps_dict=None,
                           const_params=[]):
