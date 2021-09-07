@@ -41,6 +41,7 @@ class paperfigure:
             mpl.rcParams['figure.subplot.right']=0.92
             mpl.rcParams['figure.subplot.bottom']=0.24
             mpl.rcParams['figure.subplot.top']=0.93
+            
         else:
             plt.locator_params(nbins=6)
             
@@ -50,6 +51,12 @@ class paperfigure:
             mpl.rcParams['figure.subplot.bottom']=0.15
             mpl.rcParams['figure.subplot.top']=0.95
             mpl.rcParams['figure.subplot.hspace']=0.02
+            
+        if width_in_cols<1:
+            mpl.rcParams['axes.labelpad']=3
+            mpl.rcParams['axes.titlepad']=3
+            mpl.rcParams['xtick.major.pad']=2
+            mpl.rcParams['ytick.major.pad']=2
         
         self.fig, self.ax =plt.subplots(figsize=(self.width,self.width/self.aspect_ratio))
         
@@ -78,23 +85,26 @@ class colorplot(paperfigure):
             y_data=[y_data]
             c_data=[c_data]
         ### set maximal and minimal color values
+        print('vmin,vmax',vmin,vmax)
         if vmin==None:
-            min_list=[np.nanmin(x) for x in c_data]
+            min_list=[np.nanpercentile(x,2) for x in c_data]
             self.vmin=np.nanmin(min_list)
         else:
             self.vmin=vmin
         if vmax==None:
-            max_list=[np.nanmax(x) for x in c_data]
+            max_list=[np.nanpercentile(x,98) for x in c_data]
             self.vmax=np.nanmax(max_list)
         else:
             self.vmax=vmax
+            
+        
             
         
         ### make the colorplot using scatter 
         for x,y,c in zip(x_data,y_data,c_data):
         
             sc=self.ax.scatter(x,y,c=c,cmap=self.cmap,
-                            vmin=self.vmin,vmax=self.vmax)
+                            vmin=self.vmin,vmax=self.vmax,s=0.1)
         
         ###  label axes. If no name specified try to use name of xdata
         if xlabel is not None:
@@ -112,6 +122,15 @@ class colorplot(paperfigure):
                 self.ax.set_ylabel(y_data.name)
             except:
                 pass
+            
+        ## set xlim,ylim
+        xmin=np.nanmin([np.nanmin(x) for x in x_data])
+        xmax=np.nanmax([np.nanmax(x) for x in x_data])
+        ymin=np.nanmin([np.nanmin(y) for y in y_data])
+        ymax=np.nanmax([np.nanmax(y) for y in y_data])
+        self.ax.set_xlim(xmin,xmax)
+        self.ax.set_ylim(ymin,ymax)
+            
         ### switch off grid for colorplots
         self.ax.grid(False)
         
@@ -129,10 +148,10 @@ class colorplot(paperfigure):
             
             
             if clabel is not None:
-                self.ax_cbar.set_title(clabel)
+                self.ax_cbar.set_title(clabel,fontsize=mpl.rcParams['axes.labelsize'])
             else:
                 try:
-                    self.ax_cbar.set_title(c_data.name) 
+                    self.ax_cbar.set_title(c_data.name,fontsize=mpl.rcParams['axes.labelsize']) 
                 except:
                     pass
         self.fig.tight_layout(pad=0.5)
@@ -222,7 +241,7 @@ class slider_plot:
         
         
         fig, ax = plt.subplots()
-        plt.subplots_adjust(left=0.15, bottom=0.4)
+        plt.subplots_adjust(left=0.12, bottom=0.5)
         
         p_list=[]
         for key in p_names:
@@ -230,9 +249,16 @@ class slider_plot:
             p_list.append((max_val+min_val)/2)
        
         func_vals=fun(self.x_plot,*p_list)
-        data_line, = plt.plot(self.x_plot,self.y_plot,color='blue')
-        func_line, = plt.plot(self.x_plot, func_vals,color='black', lw=2)
+        data_line, = plt.plot(self.x_plot,self.y_plot,color='blue',lw=2,label='data')
+        func_line, = plt.plot(self.x_plot, func_vals,color='green', lw=2,label='model')
+        ax.legend()
         ax.margins(x=0)
+        ax.grid(True)
+        try:
+            ax.set_xlabel(x_data.name)
+            ax.set_ylabel(y_data.name)
+        except:
+            pass
         
         axcolor = 'lightgoldenrodyellow'
         
@@ -245,10 +271,10 @@ class slider_plot:
         for key in p_min_max_steps_dict.keys():
             
             min_val,max_val,steps = p_min_max_steps_dict[key]
-            slider_ax_dict[key]=plt.axes([0.15, h_max-i*h_step, 0.65, h_step*0.7], facecolor=axcolor)
+            slider_ax_dict[key]=plt.axes([0.12, h_max-i*h_step, 0.65, h_step*0.7], facecolor=axcolor)
             slider_ax_dict[key].set_xlim(min_val,max_val)
             slider_dict[key]=Slider(slider_ax_dict[key],key,min_val,max_val,
-                                    valinit=(max_val+min_val)/2)
+                                    valinit=(max_val+min_val)/2,color='green')
             i+=1
         
         
@@ -258,8 +284,12 @@ class slider_plot:
             for key in p_names:
                 p_list.append(slider_dict[key].val)
             print(p_list)
-            func_line.set_ydata(fun(self.x_plot,*p_list))
-            fig.canvas.draw_idle()
+            self.y_fun=fun(self.x_plot,*p_list)
+            func_line.set_ydata(self.y_fun)
+            
+            ax.set_xlim(min(self.x_plot),max(self.x_plot))
+            ax.set_ylim(min([min(self.y_plot),min(self.y_fun)]),max([max(self.y_plot),max(self.y_fun)]))
+            fig.canvas.draw()
         
         ## connect sliders to update function
         for key in slider_ax_dict.keys():
@@ -273,7 +303,7 @@ class slider_plot:
             ## reset width of parameter axes
             i=1
             for key in p_min_max_steps_dict.keys():
-                slider_ax_dict[key].set_position([0.15, h_max-i*h_step, 0.3, h_step*0.7])
+                slider_ax_dict[key].set_position([0.08, h_max-i*h_step, 0.3, h_step*0.7])
                 i+=1
             
             ## initialize index sliders
@@ -287,7 +317,7 @@ class slider_plot:
                 index_slider_ax_dict[iname]=plt.axes([0.6, h_max-i*h_step, 0.3, h_step*0.7], facecolor=axcolor)
                 index_slider_ax_dict[iname].set_xlim(min_val,max_val)
                 index_slider_dict[iname]=Slider(index_slider_ax_dict[iname],iname,min_val,max_val,
-                                        valinit=(max_val+min_val)/2)
+                                        valinit=(max_val+min_val)/2,color='blue')
                 i+=1
                 
             def update_index(val):
@@ -308,7 +338,9 @@ class slider_plot:
                 data_line.set_xdata(self.x_plot)
                 data_line.set_ydata(self.y_plot)
                      
-                fig.canvas.draw_idle()
+                ax.set_xlim(min(self.x_plot),max(self.x_plot))
+                ax.set_ylim(min([min(self.y_plot),min(self.y_fun)]),max([max(self.y_plot),max(self.y_fun)]))
+                fig.canvas.draw()
                     
             for iname in y_data.index.names:
             

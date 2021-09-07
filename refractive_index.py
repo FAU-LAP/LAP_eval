@@ -15,7 +15,7 @@ class n_from_string():
         self.material_string=material_string
         try:
             path=os.path.join(package_directory,'material_files/'+material_string+'_refractive_index_database.txt')
-            lamb_n_k=np.loadtxt(path,skiprows=9).transpose()
+            lamb_n_k=np.loadtxt(path,skiprows=9,dtype=complex).transpose()
             self.lamb_list=lamb_n_k[0]*1e-6
             self.n_func=interp1d(self.lamb_list,lamb_n_k[1],bounds_error=True)
             self.k_func=interp1d(self.lamb_list,lamb_n_k[2],bounds_error=True)
