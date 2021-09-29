@@ -58,14 +58,16 @@ class paperfigure:
             mpl.rcParams['xtick.major.pad']=2
             mpl.rcParams['ytick.major.pad']=2
         
-        self.fig, self.ax =plt.subplots(figsize=(self.width,self.width/self.aspect_ratio))
         
-        ### re-create fig and ax for inclusion of colorbar:
+        ### create fig and ax with or without colorbar
         if make_cbar:
             heights=[0.05,1]
             self.fig, (self.ax_cbar,self.ax) =plt.subplots(nrows=2,ncols=1,
                                                        figsize=(self.width,self.width/self.aspect_ratio),
                                                        gridspec_kw={'height_ratios':heights})
+        else:
+            self.fig, self.ax =plt.subplots(figsize=(self.width,self.width/self.aspect_ratio))
+        
         
         
 class colorplot(paperfigure):
@@ -168,9 +170,9 @@ class multiline_plot(paperfigure):
     '''
     
     def __init__(self,x_data,y_data,c_data,
-                 xlabel=None,ylabel=None,cmap=cm.plasma,
+                 xlabel=None,ylabel=None,clabel=None,cmap=cm.plasma,
                  vmin=None,vmax=None,rel_vmin=1,rel_vmax=1,
-                 make_cbar=False,
+                 make_cbar=False, decimal_places=None,
                  **kwargs):
         super().__init__(make_cbar=make_cbar,**kwargs) 
         self.cmap=cmap
@@ -216,6 +218,34 @@ class multiline_plot(paperfigure):
         ### switch on grid for line plots
         self.ax.grid(True)
         
+        
+        ## create colorbar
+        if make_cbar:
+            
+            norm=mpl.colors.Normalize(self.vmin,self.vmax)
+            cbar=plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap),cax=self.ax_cbar,orientation='horizontal')
+            
+            # if self.width_in_cols < 0.6:
+            #     n_ticks=3
+            # else:
+            #     n_ticks=5
+            # cbar.set_ticks(list(np.linspace(self.vmin,self.vmax,n_ticks)))
+            
+            
+            cbar.set_ticks(list(c_data))
+            
+            self.ax_cbar.xaxis.tick_top()
+            
+            if decimal_places is not None: 
+                from matplotlib.ticker import FormatStrFormatter
+                self.ax_cbar.xaxis.set_major_formatter(FormatStrFormatter('%.'+str(int(decimal_places))+'f'))
+            if clabel is not None:
+                self.ax_cbar.set_title(clabel,fontsize=mpl.rcParams['axes.labelsize'])
+            else:
+                try:
+                    self.ax_cbar.set_title(c_data.name,fontsize=mpl.rcParams['axes.labelsize']) 
+                except:
+                    pass
        
 class slider_plot:   
     def __init__(self,fun, x_data=None, y_data=None,p_names=None,p_min_max_steps_dict=None,
