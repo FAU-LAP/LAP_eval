@@ -237,8 +237,9 @@ class multiline_plot(paperfigure):
                 else:
                     tick_list=list(c_data)[0::cbar_tick_step]
                     if list(c_data)[-1] not in tick_list:
-                        tick_list.append(list(c_data)[-1])
-                    cbar.set_ticks(list(c_data)[0::cbar_tick_step])
+                    
+                        tick_list[-1]=(list(c_data)[-1])
+                    cbar.set_ticks(tick_list)
             
             self.ax_cbar.xaxis.tick_top()
             
