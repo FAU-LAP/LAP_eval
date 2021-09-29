@@ -172,7 +172,7 @@ class multiline_plot(paperfigure):
     def __init__(self,x_data,y_data,c_data,
                  xlabel=None,ylabel=None,clabel=None,cmap=cm.plasma,
                  vmin=None,vmax=None,rel_vmin=1,rel_vmax=1,
-                 make_cbar=False, decimal_places=None,
+                 make_cbar=False, decimal_places=None, cbar_tick_step=None,
                  **kwargs):
         super().__init__(make_cbar=make_cbar,**kwargs) 
         self.cmap=cmap
@@ -231,11 +231,15 @@ class multiline_plot(paperfigure):
             #     n_ticks=5
             # cbar.set_ticks(list(np.linspace(self.vmin,self.vmax,n_ticks)))
             
-            
-            cbar.set_ticks(list(c_data))
+            if cbar_tick_step==None:
+                cbar.set_ticks(list(c_data))
+            else:
+                cbar.set_ticks(list(c_data)[0:-1:cbar_tick_step])
             
             self.ax_cbar.xaxis.tick_top()
             
+            
+            ## set tick decimal places
             if decimal_places is not None: 
                 from matplotlib.ticker import FormatStrFormatter
                 self.ax_cbar.xaxis.set_major_formatter(FormatStrFormatter('%.'+str(int(decimal_places))+'f'))
