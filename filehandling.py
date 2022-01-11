@@ -1,5 +1,3 @@
-
-
 import os
 import pandas as pd
 import numpy as np
@@ -26,16 +24,16 @@ def spectrum_to_pd(filepath):
     spec_df['wavelength']=spec_df['wavelength']*1e-9
     return(spec_df)
     
-def get_calibration_function(path,regex):
+def get_calibration_function(realpath,regex):
     
     """gets a calibration cal_func(wavelength) by which counts should be
     multiplied for calibration using the scipy interp1d method"""
     
     from scipy.interpolate import interp1d
     regex_condition = re.compile(regex)
-    for item in os.listdir(path):
+    for item in os.listdir(realpath):
         if regex_condition.match(item):
-            lamb, cal_factor, sensitivity = np.loadtxt(path+'/'+item,skiprows=1).T
+            lamb, cal_factor, sensitivity = np.loadtxt(realpath+'/'+item,skiprows=1).T
             cal_func = interp1d(lamb,cal_factor)
     return cal_func
         
@@ -87,49 +85,87 @@ def float_from_string(string,start='',end=''):
     return(float(extracted[0]))
     
                 
-def data_from_directory(path,read_regex='', read_function=spectrum_to_pd, var_strings=[], var_regex_dict={}):
+def data_from_directory(realpath,read_regex='', read_function=spectrum_to_pd, var_strings=[], var_regex_dict={}, walk_bool = False):
     """loads all files in path resulting in a pd dataframe of descriptions and dataframes. 
     only files with 'read_regex' in filename are included.
     'read_function' shall return a pandas dataframe with filepath as argument. 
     With 'start_strings','end_strings', variables with 'extractor_names' are 
-    extracted from filenames and added to final dataframe
+    extracted from filenames and added to final dataframe. 
+    Choose walk_bool = True for os.walk instead of os.listdir function. 
+    If errors pop up try using an external terminal to run your code.
     """
-    print(path)
+    print(os.path.abspath(realpath))
+    
     path_list=[]
     modify_time_list=[]
     df_list=[]
     var_dict={}
+    
     for var_string in var_strings:
         var_dict[var_string]=[]
     for key in var_regex_dict.keys():
-        var_dict[key]=[]
+        var_dict[key]=[]            
     
-    for filename in os.listdir(path):
-        if len(re.findall(read_regex,filename))>0:
-            print(filename)
-            filepath=path+'/'+filename
-            modify_time_list.append(datetime.datetime.fromtimestamp(os.stat(filepath)[8])) ## os.stat()[8] gets the modify time
-            path_list.append(filepath)
-            df_list.append(read_function(filepath))
-            for var_string in var_strings:
-                var_val=re.findall(var_string+'\D*(\d+\.?\d*)',filename)
-                if len(var_val)==0:
-                    raise Exception('var_string "'+var_string+'" could not be found with value in "'+filename+'"')
-                else:
-                    var_val=float(var_val[0])
-                var_dict[var_string].append(var_val)
-            for key,var_regex in var_regex_dict.items():
-                var_val=re.findall(var_regex,filename)
-                if len(var_val)==0:
-                    raise Exception('var_regex "'+var_regex+'" could not be found with value in "'+filename+'"')
-                else:
-                    var_val=float(var_val[0])
-                var_dict[key].append(var_val)
-    data_dict={'filepath':path_list,'modify_time':modify_time_list,'data':df_list}
-    data_dict={**data_dict,**var_dict}
-    data=pd.DataFrame.from_dict(data_dict)
-    data=data.sort_values('modify_time').reset_index(drop=True)
-    return data
+    def choose_walk(realpath): # this is technically obsolete, but the function is more flexible this way, see note l.139
+        if walk_bool == True:
+            for root, dirs, files in os.walk(realpath):#one could upgrade this to scandir.walk or some pathlib object 
+                for filename in files:
+                    if ".txt" in filename or ".csv" in filename or ".dat" in filename:
+                        if len(re.findall(read_regex,filename))>0:
+                            filepath=os.path.normpath(root+'/'+filename)
+                            filepath=os.path.abspath(filepath)
+                            modify_time_list.append(datetime.datetime.fromtimestamp(os.stat(filepath)[8])) ## os.stat()[8] gets the modify time
+                            path_list.append(filepath)
+                            df_list.append(read_function(filepath))
+                            for var_string in var_strings:
+                                var_val=re.findall(var_string+'\D*(\d+\.?\d*)',filename)
+                                if len(var_val)==0:
+                                    raise Exception('var_string "'+var_string+'" could not be found with value in "'+filename+'"')
+                                else:
+                                    var_val=float(var_val[0])
+                                var_dict[var_string].append(var_val)
+                            for key,var_regex in var_regex_dict.items():
+                                var_val=re.findall(var_regex,filename)
+                                if len(var_val)==0:
+                                    raise Exception('var_regex "'+var_regex+'" could not be found with value in "'+filename+'"')
+                                else:
+                                    var_val=float(var_val[0])
+                                var_dict[key].append(var_val)      
+            data_dict={'filepath':path_list,'modify_time':modify_time_list,'data':df_list}
+            data_dict={**data_dict,**var_dict}
+            data=pd.DataFrame.from_dict(data_dict)
+            data=data.sort_values('modify_time').reset_index(drop=True)
+            return data
+#----------------------- this second part is technically obsolete, but may be useful if the combinde scope of the walk & the selector (regex) is too big       
+        if walk_bool == False:
+            for filename in os.listdir(realpath):
+                if len(re.findall(read_regex,filename))>0:
+                    filepath=realpath+'/'+filename
+                    modify_time_list.append(datetime.datetime.fromtimestamp(os.stat(filepath)[8])) ## os.stat()[8] gets the modify time
+                    path_list.append(filepath)
+                    df_list.append(read_function(filepath))
+                    for var_string in var_strings:
+                        var_val=re.findall(var_string+'\D*(\d+\.?\d*)',filename)
+                        if len(var_val)==0:
+                            raise Exception('var_string "'+var_string+'" could not be found with value in "'+filename+'"')
+                        else:
+                            var_val=float(var_val[0])
+                        var_dict[var_string].append(var_val)
+                    for key,var_regex in var_regex_dict.items():
+                        var_val=re.findall(var_regex,filename)
+                        if len(var_val)==0:
+                            raise Exception('var_regex "'+var_regex+'" could not be found with value in "'+filename+'"')
+                        else:
+                            var_val=float(var_val[0])
+                        var_dict[key].append(var_val)
+            data_dict={'filepath':path_list,'modify_time':modify_time_list,'data':df_list}
+            data_dict={**data_dict,**var_dict}
+            data=pd.DataFrame.from_dict(data_dict)
+            data=data.sort_values('modify_time').reset_index(drop=True)
+            return data
+    
+    return choose_walk(realpath)
+        
 
 if __name__ == "__main__":
     ## do test cases of all functions
@@ -138,8 +174,8 @@ if __name__ == "__main__":
     data_object=dat_to_object('test_data/space_separated.dat')
     dataframe=dat_to_pd('test_data/LAP_Measurment_output.dat')
     spec_data=spectrum_to_pd('test_data/spectrum.txt')
-    data=data_from_directory('test_data',read_regex='spectrum_30s',
-                              read_function=spectrum_to_pd,var_strings=['V_Piezo','V_SMU'])
+    data=data_from_directory('../../',read_regex='spectrum_30s',
+                          read_function=spectrum_to_pd,var_strings=['V_Piezo','V_SMU'])          
     print(data) 
     input('test finished, press Enter to quit')
     
