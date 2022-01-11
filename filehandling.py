@@ -3,9 +3,6 @@ import pandas as pd
 import numpy as np
 import re
 import datetime
-"""
-This is a test, to test git pushes - Alex 2022-01-11
-"""
 
 
 def ensure_dir_exists(dir_name):
