@@ -162,6 +162,28 @@ def data_from_directory(realpath,read_regex='', read_function=spectrum_to_pd, va
             return data
     
     return choose_walk(realpath)
+
+class save_headers_lists_to_csv:
+    """Takes a list of headers and a list of lists and writes it to a csv file with name filename"""
+
+    def __init__(self,headers,lists,filename,commentlines=0):
+        import csv
+        array=np.array(lists).transpose()
+        print('bin in savedat,',headers)
+        print(filename)
+
+        csvfile = open(filename,'w',newline='')
+        print('csvfile geöffnet')
+        writer = csv.writer(csvfile,delimiter='\t')
+        if commentlines > 0:
+            for i in range(commentlines):
+                writer.writerow('#')
+        writer.writerow(headers)
+    
+        
+        for i in range(len(lists[0])):
+            writer.writerow(array[i])
+        csvfile.close()
         
 
 if __name__ == "__main__":
@@ -175,5 +197,7 @@ if __name__ == "__main__":
                           read_function=spectrum_to_pd,var_strings=['V_Piezo','V_SMU'])          
     print(data) 
     input('test finished, press Enter to quit')
+    
+
     
     

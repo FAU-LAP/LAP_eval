@@ -1,13 +1,14 @@
 import numpy as np
 import math
 import scipy.constants as const
+import scipy.signal as sig
 from scipy.interpolate import interp1d
 import lmfit
 from lmfit import Parameters
 import matplotlib.pyplot as plt
 import pandas as pd
 import copy
-
+from LAP_eval import filehandling as fh
 
 
     
@@ -319,6 +320,266 @@ def stitchSpectra(lamb_list,count_list, method="scale", edgeremove=(0, 0), shift
     
     return (lambdas,specdata,coefficients)
 
+
+def get_calibration_wl_intensity_from_pd (df,wl_string='wavelength',counts_string='counts',n_peaks_max=3,save_string=''):
+    
+    """calculates a calibration spectrum from multiple Fabry-Perot reflection specta"""
+    
+    counts_array=[]
+    
+    for i in df.index:
+        counts_array.append(np.array(df['data'][i][counts_string]))
+    counts_array=np.array(counts_array)
+    
+    wl_list=df['data'][0][wl_string]
+    
+    trans=counts_array.transpose()
+    
+    win=sig.hann(20)
+    counts_norm=[]
+    
+    for i in range(len( wl_list)):
+        
+        filtered=sig.convolve(trans[i],win,mode='same')
+        i_peak,dump = sig.find_peaks(filtered)
+        counts_norm.append(np.sum(trans[i][i_peak[0]:i_peak[n_peaks_max]])/(i_peak[n_peaks_max]-i_peak[0]))
+       # print(lamb_list[0][i],i_peak[1],i_peak[2])
+    counts_norm=np.array(counts_norm)
+    if save_string!='':
+        headers=[wl_string,counts_string]
+        lists=[wl_list,counts_norm]
+        fh.save_headers_lists_to_csv(headers,lists,save_string,commentlines=3)
+    return (wl_list,counts_norm)
+
+
+
+def distance_from_spec(lamb,intensity,calib_spec_path,return_dict=False,plot=False,input_error=False,d_force=0,theta_max=0,d_fit_max='none',d_fit_min='none',function='none',intensity_calib_override='none',intensity_override='none'):
+    
+    
+    """Distance_from_spec calculates a distance from a reflectance spectrum.
+    Lamb is a list of wavelengths
+    Intensity is a list of counts
+    calib_spec_path is a path to the calibration spectrum potentially calculated by the function get_calibration_wl_intensity_from_pd
+    theta_max is the maximum opening angle
+    
+    Returns d if return_dict is not True
+    Returns a dictionary with d, lamb_normed, func_vals.
+    """
+
+    lamb=np.array(lamb)
+    intensity=np.array(intensity)
+    
+    try:
+        calib_data=pd.read_csv(calib_spec_path,names=['wavelength','counts'],skiprows=4,delimiter='\t')
+    except: 
+        print('Error: Could not load datafile')
+    
+    lamb_calib,intensity_calib= np.array(calib_data['wavelength']),np.array(calib_data['counts'])
+    
+    if intensity_calib_override != 'none':
+        intensity_calib=intensity_calib_override
+    
+    ### Find minima and maxima
+    
+    lamb_min=min(lamb[0],lamb_calib[0])
+    lamb_max=max(lamb[-1],lamb_calib[-1])
+    
+    i_min_lamb=np.argmin(np.abs(lamb-lamb_min))
+    i_min_lamb_calib=np.argmin(np.abs(lamb_calib-lamb_min))
+    i_max_lamb=np.argmin(np.abs(lamb-lamb_max))+1
+    i_max_lamb_calib=np.argmin(np.abs(lamb_calib-lamb_max))+1
+    
+    
+    I_normed=intensity[i_min_lamb:i_max_lamb]/intensity_calib[i_min_lamb_calib:i_max_lamb_calib]
+    if intensity_override!='none':
+        I_normed=intensity_override
+    lamb_normed=lamb[i_min_lamb:i_max_lamb]
+
+    
+    win=sig.hann(70)
+    I_normed_filtered=sig.convolve(I_normed,win,mode='same')/np.sum(win)
+    j_peak,dump = sig.find_peaks(I_normed_filtered)
+    j_minima,dump=sig.find_peaks(-I_normed_filtered)
+    ## correct peaks by fitting Parabola
+    print('bin bei correct peaks')
+    
+    lamb_max=[]
+    for j in j_peak:
+        if j>30 and j< len(lamb_normed)-40 and I_normed[j]>np.percentile(I_normed,50):
+            lamb_max.append(lamb_normed[j])
+            
+
+            
+    lamb_min=[]
+    for j in j_minima:
+        if j>30 and j< len(lamb_normed)-40 and I_normed[j]<np.percentile(I_normed,30):
+            lamb_min.append(lamb_normed[j])
+            
+    lamb_extrema=np.concatenate((np.array(lamb_max),np.array(lamb_min)))
+    
+    
+    ## calculate n and d from min,max
+    if len(lamb_extrema)>1:
+        lamb_ex_max=max(lamb_extrema)
+        lamb_ex_min=min(lamb_extrema)
+        delta_n=1/2*(len(lamb_extrema)-1)   ## wenn \delta n =1 => len=2
+        print('delta_n:',delta_n)
+        d_approx=delta_n/2/(1/lamb_ex_min-1/lamb_ex_max)
+        try:
+            n=int(2*d_approx/lamb_min[-1]) ## benutze Position des langwelligsten Minimums für exakten Abstand
+            d=n*lamb_min[-1]/2
+        except:
+            n=1
+            d=0
+    
+        if theta_max !=0:
+            d=d*np.cos(theta_max)
+    else:
+        print('no d and n found...')
+        d=1000e-9
+        n=0
+    
+    if d_force !=0:
+        d=d_force
+        
+    ### Possible Fit-functions      
+    
+    def FabryPerot(d,F,lamb):
+        """The Fabry-Perot reflectance formula"""
+        return(1-1/(1+F*np.sin(2*np.pi*d/lamb)**2))
+    
+    def FabryPerot_min_max(d,I_min,I_max,F,lamb):
+        """The Fabry_perot reflectance formula mapped to I_min to I_max"""
+    
+        return(I_min+(I_max-I_min)/(1-1/(1+F))*(1-1/(1+F*np.sin(2*np.pi*d/lamb)**2)))
+        
+    
+        
+    def FabryPerot_min_max_theta_max(d,I_min,I_max,F,lamb,theta_max):
+        """The Fabry_perot reflectance formula including finite opening angle theta_max mapped to I_min to I_max"""
+        R_list=0*lamb
+        theta_list=np.linspace(0,theta_max,10)
+        for theta in theta_list:
+            R_list=R_list+FabryPerot(d*np.cos(theta),F,lamb)*np.sin(theta)#*np.cos(theta)**2
+        
+        Delta=I_max-I_min
+        base=np.min(R_list)
+        var=R_list-base
+        R_list=I_min+var*Delta/max(var)
+        return(R_list)
+        
+    ### do Fabry Perot fit the method is analogous to the brute-least-squares fit from lap_eval.evaluation_functions
+    params=Parameters()
+    if d_fit_min=='none':
+        d_fit_min=d-1000e-9
+    if d_fit_max=='none':
+        d_fit_max=d+1000e-9
+    print('d_fit_min,d_fit_max',d_fit_min,d_fit_max)
+    params.add('d',d,min=d_fit_min,max=d_fit_max,brute_step=2e-9)
+    print('d_start' , d)
+    I_min=np.percentile(I_normed,1) ## I_min=np.percentile(I_normed,5)
+    I_max=np.percentile(I_normed,97) ## I_min=np.percentile(I_normed,95)
+    F=1.22
+    
+
+    #FabryPerot_min_max_theta_max=np.frompyfunc(FabryPerot_min_max_theta_max,6,1)    
+    
+        
+    def cost_function_fit(lamb_list,I_list,I_min,I_max,F,params=params):
+        def fun(pars):
+            parvals = pars.valuesdict()
+            d=parvals['d']
+            
+            if theta_max==0:
+            
+                if function=='none':
+                    ret=np.array((FabryPerot_min_max(d,I_min,I_max,F,lamb_list)-I_list)**2,dtype=float)
+                else:
+                    ret=np.array((function(d*1e-9,lamb_list*1e-9)-I_list)**2,dtype=float)
+            else:
+                
+                if function == 'none':
+                    R_list = FabryPerot_min_max_theta_max(d,I_min,I_max,F,lamb_list,theta_max)
+                    ret = np.array(R_list-I_list,dtype=float)
+                else:
+                    print('function not implemented with maximum angle')
+                
+            return(ret)
+        brute_result=lmfit.minimize(fun,params,method='brute')
+        best_result=copy.deepcopy(brute_result)
+        for candidate in brute_result.candidates[0:5]:
+            trial = lmfit.minimize(fun, params=candidate.params,method='leastsq')
+            if trial.chisqr < best_result.chisqr:
+                best_result = trial
+        return(best_result.params.valuesdict())
+    
+    fit_dict=cost_function_fit(lamb_normed,I_normed*np.linspace(1,1.0,len(I_normed)),I_min,I_max,F,params)
+    print(fit_dict)
+    d=fit_dict['d']
+    print('return_1_start_'+str(d)+'_return_1_stop')
+   
+    
+    if(plot):
+        
+        fig,((ax1,ax2),(ax3,ax4))= plt.subplots(nrows=2,ncols=2)
+            
+        
+        ax1.plot(lamb*1e9,intensity)
+        ax1.set_xlabel(r'$\lambda$ in nm')
+        ax1.set_ylabel('intensity in a.u.')
+        ax1.set_title('raw data')
+       
+        ax2.plot(lamb_calib*1e9,intensity_calib)
+        ax2.set_xlabel(r'$\lambda$ in nm')
+        ax2.set_ylabel('intensity in a.u.')
+        ax2.set_title('calibration data')
+        
+        ax3.plot(lamb_normed*1e9,I_normed)
+        ax3.set_xlabel(r'$\lambda$ in nm')
+        ax3.set_ylabel('normed intensity in a.u.')
+        
+        
+        
+        if(input_error):
+            ax3.set_title('Input error: Spectrum of test data: d= '+'{d:.0f} nm'.format(d=d),color='red')
+        else:
+            ax3.set_title('calibrated spectrum: d= '+'{d:.0f} nm'.format(d=d*1e9))
+
+        for j in j_peak:
+            if j>30 and j< len(lamb_normed)-40 and I_normed[j]>np.percentile(I_normed,50):
+                ax3.scatter(lamb_max[-1]*1e9,I_normed_filtered[j],color='red')
+            
+       
+        for j in j_minima:
+            if j>30 and j< len(lamb_normed)-40 and I_normed[j]<np.percentile(I_normed,30):
+                ax3.scatter(lamb_min[-1]*1e9,I_normed_filtered[j],color='blue')    
+        
+        ax4.plot(const.c/lamb_normed/1e12,I_normed)
+        ax4.set_xlabel(r'$f$ in THz')
+        ax4.set_ylabel('normed intensity in a.u.')
+        ax1.figure.tight_layout()
+        ax1.figure.canvas.draw()
+        
+        if function == 'none':
+            if theta_max == 0 : 
+                ax3.plot(lamb_normed*1e9,FabryPerot_min_max(fit_dict['d'],I_min,I_max,F,lamb_normed))
+            else: 
+                ax3.plot(lamb_normed*1e9,FabryPerot_min_max_theta_max(fit_dict['d'],I_min,I_max,F,lamb_normed,theta_max))
+                
+        else:
+            ax3.plot(lamb_normed,function(d*1e-9,lamb_normed*1e-9))
+      
+            
+    if plot:
+        plt.show()
+    print('fitted distance: ',d)
+    
+    if(return_dict):
+        func_vals=FabryPerot_min_max_theta_max(fit_dict['d'],I_min,I_max,F,lamb_normed,theta_max)
+        print(func_vals)
+        return({'d':d,'lamb_normed':lamb_normed,'func_vals':func_vals})
+    else:            
+        return(d)
 
 
 
