@@ -8,6 +8,7 @@ from lmfit import Parameters
 import matplotlib.pyplot as plt
 import pandas as pd
 import copy
+
 from LAP_eval import filehandling as fh
 
 
@@ -353,7 +354,7 @@ def get_calibration_wl_intensity_from_pd (df,wl_string='wavelength',counts_strin
 
 
 
-def distance_from_spec(lamb,intensity,calib_spec_path,return_dict=False,plot=False,input_error=False,d_force=0,theta_max=0,d_fit_max='none',d_fit_min='none',function='none',intensity_calib_override='none',intensity_override='none'):
+def distance_from_spec(lamb,intensity,calib_spec_path,return_dict=False,plot=False,input_error=False,d_force=0,theta_max=0,d_fit_min=1e-9,d_fit_max=10e-6,refractive_index=2.6,function='none',intensity_calib_override='none',intensity_override='none'):
     
     
     """Distance_from_spec calculates a distance from a reflectance spectrum.
@@ -361,6 +362,7 @@ def distance_from_spec(lamb,intensity,calib_spec_path,return_dict=False,plot=Fal
     Intensity is a list of counts
     calib_spec_path is a path to the calibration spectrum potentially calculated by the function get_calibration_wl_intensity_from_pd
     theta_max is the maximum opening angle
+    assumes symmetric cavity, refractive_index=2.6 is default for SiC
     
     Returns d if return_dict is not True
     Returns a dictionary with d, lamb_normed, func_vals.
@@ -396,52 +398,6 @@ def distance_from_spec(lamb,intensity,calib_spec_path,return_dict=False,plot=Fal
     lamb_normed=lamb[i_min_lamb:i_max_lamb]
 
     
-    win=sig.hann(70)
-    I_normed_filtered=sig.convolve(I_normed,win,mode='same')/np.sum(win)
-    j_peak,dump = sig.find_peaks(I_normed_filtered)
-    j_minima,dump=sig.find_peaks(-I_normed_filtered)
-    ## correct peaks by fitting Parabola
-    print('bin bei correct peaks')
-    
-    lamb_max=[]
-    for j in j_peak:
-        if j>30 and j< len(lamb_normed)-40 and I_normed[j]>np.percentile(I_normed,50):
-            lamb_max.append(lamb_normed[j])
-            
-
-            
-    lamb_min=[]
-    for j in j_minima:
-        if j>30 and j< len(lamb_normed)-40 and I_normed[j]<np.percentile(I_normed,30):
-            lamb_min.append(lamb_normed[j])
-            
-    lamb_extrema=np.concatenate((np.array(lamb_max),np.array(lamb_min)))
-    
-    
-    ## calculate n and d from min,max
-    if len(lamb_extrema)>1:
-        lamb_ex_max=max(lamb_extrema)
-        lamb_ex_min=min(lamb_extrema)
-        delta_n=1/2*(len(lamb_extrema)-1)   ## wenn \delta n =1 => len=2
-        print('delta_n:',delta_n)
-        d_approx=delta_n/2/(1/lamb_ex_min-1/lamb_ex_max)
-        try:
-            n=int(2*d_approx/lamb_min[-1]) ## benutze Position des langwelligsten Minimums für exakten Abstand
-            d=n*lamb_min[-1]/2
-        except:
-            n=1
-            d=0
-    
-        if theta_max !=0:
-            d=d*np.cos(theta_max)
-    else:
-        print('no d and n found...')
-        d=1000e-9
-        n=0
-    
-    if d_force !=0:
-        d=d_force
-        
     ### Possible Fit-functions      
     
     def FabryPerot(d,F,lamb):
@@ -470,16 +426,20 @@ def distance_from_spec(lamb,intensity,calib_spec_path,return_dict=False,plot=Fal
         
     ### do Fabry Perot fit the method is analogous to the brute-least-squares fit from lap_eval.evaluation_functions
     params=Parameters()
-    if d_fit_min=='none':
-        d_fit_min=d-1000e-9
-    if d_fit_max=='none':
-        d_fit_max=d+1000e-9
+    
     print('d_fit_min,d_fit_max',d_fit_min,d_fit_max)
-    params.add('d',d,min=d_fit_min,max=d_fit_max,brute_step=2e-9)
-    print('d_start' , d)
+    params.add('d',d_fit_min,min=d_fit_min,max=d_fit_max,brute_step=2e-9)
+    print('d_start' , d_fit_min)
     I_min=np.percentile(I_normed,1) ## I_min=np.percentile(I_normed,5)
     I_max=np.percentile(I_normed,97) ## I_min=np.percentile(I_normed,95)
-    F=1.22
+    
+    def R (n):
+        return(((1-n)/(1+n))**2)
+               
+    def F_symm(R_0):
+        return(4*R_0/(1-R_0)**2)
+        
+    F=F_symm(R(refractive_index))
     
 
     #FabryPerot_min_max_theta_max=np.frompyfunc(FabryPerot_min_max_theta_max,6,1)    
@@ -544,15 +504,7 @@ def distance_from_spec(lamb,intensity,calib_spec_path,return_dict=False,plot=Fal
             ax3.set_title('Input error: Spectrum of test data: d= '+'{d:.0f} nm'.format(d=d),color='red')
         else:
             ax3.set_title('calibrated spectrum: d= '+'{d:.0f} nm'.format(d=d*1e9))
-
-        for j in j_peak:
-            if j>30 and j< len(lamb_normed)-40 and I_normed[j]>np.percentile(I_normed,50):
-                ax3.scatter(lamb_max[-1]*1e9,I_normed_filtered[j],color='red')
-            
-       
-        for j in j_minima:
-            if j>30 and j< len(lamb_normed)-40 and I_normed[j]<np.percentile(I_normed,30):
-                ax3.scatter(lamb_min[-1]*1e9,I_normed_filtered[j],color='blue')    
+ 
         
         ax4.plot(const.c/lamb_normed/1e12,I_normed)
         ax4.set_xlabel(r'$f$ in THz')
