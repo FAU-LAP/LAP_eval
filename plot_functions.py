@@ -263,7 +263,7 @@ class slider_plot:
         from matplotlib.widgets import Slider, Button
         try: 
             from LAP_eval import evaluation_functions as eval_func
-        except:
+        except ImportError:
             import evaluation_functions as eval_func
         ### takes 
         self.x_data=x_data
@@ -457,7 +457,7 @@ class slider_plot:
     
 if __name__ == '__main__':
     
-    test_colorplot=False
+    test_colorplot=True
     if(test_colorplot):
         ## make list of lists for colorplot testing:
             
@@ -465,7 +465,7 @@ if __name__ == '__main__':
         ydata=[]
         cdata=[]
         
-        for i in range(100):
+        for i in range(200):
             xdata.append(np.linspace(0,10,200))
             ydata.append(np.ones(200)*i)
             cdata.append(np.sin(xdata[-1]*10/i))
@@ -475,7 +475,7 @@ if __name__ == '__main__':
     
     
     
-    test_multiline_plot=False
+    test_multiline_plot=True
     
     if test_multiline_plot:
         ## make list of lists for colorplot testing:
@@ -495,7 +495,7 @@ if __name__ == '__main__':
         cplot_halfcolumn=multiline_plot(xdata,ydata,cdata,xlabel=r'$x$',ylabel=r'$y$',width_in_cols=0.5)
         cplot_onecolumn=multiline_plot(xdata,ydata,cdata,xlabel=r'$x$',ylabel=r'$y$',width_in_cols=1)
         
-    test_slider_plot=True
+    test_slider_plot=False
     if test_slider_plot:
         def fun(x,a,b,c):
             ret=a*np.sin(b*x)*np.exp(c*x)
@@ -509,7 +509,7 @@ if __name__ == '__main__':
         slider_plot(fun,xdata,ysim,p_names=['a','b','c'],
                                          p_min_max_steps_dict={'a':[0,2,40],'b':[0,10,40],'c':[-1,1,40]})
         
-    test_slider_plot_with_df=False
+    test_slider_plot_with_df=True
     if test_slider_plot_with_df:
         def fun(x,a,b,c):
             ret=a*np.sin(b*x)*np.exp(c*x)

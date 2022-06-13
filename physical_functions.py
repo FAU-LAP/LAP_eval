@@ -6,7 +6,10 @@ Created on Mon Aug 16 16:39:29 2021
 """
 import numpy as np
 import scipy.constants as const
-from LAP_eval import refractive_index as ri
+try:
+    from LAP_eval import refractive_index as ri
+except: 
+    import refractive_index as ri
 
 
 

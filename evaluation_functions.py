@@ -9,7 +9,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import copy
 
-from LAP_eval import filehandling as fh
+try: 
+    from LAP_eval import filehandling as fh
+except: 
+    import filehandling as fh
 
 
     
@@ -549,7 +552,7 @@ if __name__=='__main__':
         df['y_sim']=df['y_data']+df['noise']
         
         arg_list = brute_leastsquare_fit(fun,df['x_data'],df['y_sim'],p_names=['a','b','c'],
-                                         p_min_max_steps_dict={'a':[0,2,40],'b':[0,10,40],'c':[-1,1,40]},
+                                         p_min_max_steps_dict={'a':[0,2,20],'b':[0,10,20],'c':[-1,1,20]},
                                          visualize=True)
         df['fitted_function']=fun(df['x_data'],*arg_list)
         df.plot('x_data')

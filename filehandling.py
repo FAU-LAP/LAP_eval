@@ -193,10 +193,10 @@ if __name__ == "__main__":
     data_object=dat_to_object('test_data/space_separated.dat')
     dataframe=dat_to_pd('test_data/LAP_Measurment_output.dat')
     spec_data=spectrum_to_pd('test_data/spectrum.txt')
-    data=data_from_directory('../../',read_regex='spectrum_30s',
-                          read_function=spectrum_to_pd,var_strings=['V_Piezo','V_SMU'])          
-    print(data) 
-    input('test finished, press Enter to quit')
+  #  data=data_from_directory('../../',read_regex='spectrum_30s',
+                 #         read_function=spectrum_to_pd,var_strings=['V_Piezo','V_SMU'])          
+  #  print(data) 
+   # input('test finished, press Enter to quit')
     
 
     
