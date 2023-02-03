@@ -115,7 +115,7 @@ def data_from_directory(realpath,read_regex='', read_function=spectrum_to_pd, va
                             path_list.append(filepath)
                             df_list.append(read_function(filepath))
                             for var_string in var_strings:
-                                var_val=re.findall(var_string+'\D*(\d+\.?\d*)',filename)
+                                var_val=re.findall(var_string+'(\+?-?\d+\.?\d*E?\+?-?\d{0,3})',filename)
                                 if len(var_val)==0:
                                     raise Exception('var_string "'+var_string+'" could not be found with value in "'+filename+'"')
                                 else:
@@ -142,7 +142,7 @@ def data_from_directory(realpath,read_regex='', read_function=spectrum_to_pd, va
                     path_list.append(filepath)
                     df_list.append(read_function(filepath))
                     for var_string in var_strings:
-                        var_val=re.findall(var_string+'\D*(\d+\.?\d*)',filename)
+                        var_val=re.findall(var_string+'(\+?-?\d+\.?\d*E?\+?-?\d{0,3})',filename)
                         if len(var_val)==0:
                             raise Exception('var_string "'+var_string+'" could not be found with value in "'+filename+'"')
                         else:

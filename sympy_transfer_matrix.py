@@ -3,11 +3,6 @@
 Created on Tue May 18 16:32:48 2021
 
 @author: jo28dohe
-
-this package is strongly influenced by the python tmm package. 
-for better performance repeatedly evaluated functions can be created with a lot of math already solved. 
-
-
 """
 
 ### testing around with sp and transfer matrices
@@ -16,12 +11,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm 
 import sympy as sp
-from sympy.utilities.lambdify import lambdify
+from sympy.utilities.lambdify import lambdify,implemented_function
 sp.init_printing()
-try:
-    import refractive_index as ri
-except:
-    from LAP_eval import refractive_index as ri
+import timeit
+import sys
+import refractive_index.refractive_index as ri
 
 n=sp.Symbol('n')
 l=sp.Symbol('l')
@@ -33,15 +27,14 @@ n3=sp.Symbol('n3')
 n_SiC=2.6   ### bei 800nm https://refractiveindex.info/?shelf=main&book=SiC&page=Wang-4H-o
 n_SiO2=1.45   ##https://refractiveindex.info/?shelf=main&book=SiO2&page=Malitson
 
-#n_SiC=ri.n_from_string('SiC')
+
 n_Au=ri.n_from_string('Au') 
 n_Al=ri.n_from_string('Al') 
 n_MoS2_ML=ri.n_from_string('MoS2').get_n(600e-9)
-n_graphene=ri.n_from_string('graphene')
+print(n_MoS2_ML)
 
 d_Al=3.5e-9
 d_MoS2=0.615e-9
-d_graphene=0.35e-9
 d_SiO2=135e-9
 d_vac=2300e-9
 d_Au=50e-9
@@ -123,23 +116,21 @@ class sympy_tmm():
     like Reflectance, Transmission and depth-dependant E-Field
     """
 
-    def __init__(self,n_value_list=[n_SiC,n_graphene,1,n_Au,n_SiC],
-                d_value_list=[np.inf,d_graphene,d_vac,d_Au, np.inf],
-                d_parameter_list=[2],
-                n_parameter_list=[1,3],
-                lamb_list=np.linspace(530e-9,1000e-9,200)):
+    def __init__(self,n_value_list=[n_SiO2,n_Al,n_SiO2,n_MoS2_ML,1,n_Au,n_SiC],
+                d_value_list=[np.inf, d_Al,d_SiO2,d_MoS2,d_vac,d_Au, np.inf],
+                d_parameter_list=[4],
+                n_parameter_list=[1,5]):
         
         assert len(n_value_list)== len(d_value_list), 'n_value_list and d_value_list must have same lenght!'
         assert len(n_value_list)>1, 'n_value_list must have more than 1 entry'
 
-
-        self.lamb_list=lamb_list
         self.n_value_list=n_value_list
         self.d_value_list=d_value_list
         self.d_parameter_list=d_parameter_list
         self.n_parameter_list=n_parameter_list
         
-        
+
+
         self.n_list=[]
         self.d_list=[]
         self.lamb=sp.Symbol('lamb')
@@ -160,6 +151,7 @@ class sympy_tmm():
         
         
         
+        print(self.n_list,self.d_list)
         ## initialize Transfer Matrix at last boundary:
         self.M__=D__(self.n_list[-2],self.n_list[-1])
         ## save list that contains Transfer matrices of all boundaries from last to first (for E-field calculation)
@@ -188,10 +180,11 @@ class sympy_tmm():
         self.lam_R=lambdify(self.lambdify_args,self.R)    
         self.lam_T=lambdify(self.lambdify_args,self.T)
         
-        
-    def plot_R_T(self,lamb_list,d_vac=d_vac,n_lists=()):
-        params=*n_lists,d_vac
-        print(params)
+        print('Total M__, lam_R, lam_T created, all_parameter_list: ',self.all_parameter_list)
+
+    def plot_R_T(self,lamb_min,lamb_max,nlamb=200,d_vac=d_vac):
+        lamb_list=np.linspace(lamb_min,lamb_max,nlamb)
+        params=n_Al.get_n(lamb_list),n_Au.get_n(lamb_list),d_vac
         plt.plot(lamb_list,self.lam_R(lamb_list,*params),label='R')
         plt.plot(lamb_list,self.lam_T(lamb_list,*params),label='T')
         plt.plot(lamb_list,self.lam_R(lamb_list,*params)+self.lam_T(lamb_list,*params),label='Sum')
@@ -199,24 +192,25 @@ class sympy_tmm():
         plt.legend()
         plt.show()
         
-    def plot_R_d(self,lamb_list,d_min,d_max,n_lists,n_d=200):
+    def plot_R_d(self,lamb_min,lamb_max,d_min,d_max,n_lamb=200,n_d=200):
+        lamb_list=np.linspace(lamb_min,lamb_max,n_lamb)
         d_list=np.linspace(d_min,d_max,n_d)
         plt.figure()
         for i in range(len(d_list)):
-            plt.scatter(lamb_list,np.ones(len(lamb_list))*d_list[i],c=self.lam_R(lamb_list,*n_lists,d_list[i]),
+            plt.scatter(lamb_list,np.ones(len(lamb_list))*d_list[i],c=self.lam_R(lamb_list,n_Al.get_n(lamb_list),n_Au.get_n(lamb_list),d_list[i]),
                         vmin=0,vmax=1,cmap=cm.nipy_spectral)
         plt.xlim(min(lamb_list),max(lamb_list))
         plt.ylim(min(d_list),max(d_list))
         plt.show()
         
         
-    def R_fit_func(self,d,lamb_list,n_lists):
-        R=self.lam_R(lamb_list,*n_lists,d)
+    def R_fit_func(self,d,d2,lamb_list):
+        R=self.lam_R(lamb_list,d,d2)
         return (R)
         
-    def make_lam_E(self,d_E=0):
+    def make_lam_E(self,d=d_SiO2+d_Al+d_MoS2/2):
        
-        i_layer,d_extra=find_in_structure_with_inf(self.d_value_list, d_E)
+        i_layer,d_extra=find_in_structure_with_inf(self.d_value_list, d)
         self.E_r_l_boundary_list=[sp.Matrix([self.t,0])]
         for i in range(len(self.M__list)):
             self.E_r_l_boundary_list.append(self.M__list[i]*self.E_r_l_boundary_list[0])
@@ -227,6 +221,7 @@ class sympy_tmm():
             d_prop=self.d_list[i_layer]-d_extra
         E_r_l_pos=P__(self.n_list[i_layer],d_prop,self.lamb)*self.E_r_l_boundary_list[-1-i_layer]  ## propagation from right side of i_layer_th material to position
         
+        print(self.all_parameter_list)
         self.lam_E_r=lambdify(self.lambdify_args,E_r_l_pos[0])
         self.lam_E_l=lambdify(self.lambdify_args,E_r_l_pos[1])
         self.lam_E_ges=lambdify(self.lambdify_args,E_r_l_pos[0]+E_r_l_pos[1])
@@ -234,14 +229,15 @@ class sympy_tmm():
         return(self.lam_E_ges)
         
         
-    def plot_spectrum_modification(self,lamb_list,d_E=0,n_lists=(),d_vac_min=0,d_vac_max=2300e-9):
+    def plot_spectrum_modification(self,d=d_SiO2+d_Al+d_MoS2/2,lamb_min=530e-9,lamb_max=870e-9,d_vac_min=0,d_vac_max=2300e-9):
             
-        self.make_lam_E(d_E=d_E)
+        self.make_lam_E(d=d)
         plt.figure()
+        lamb_list=np.linspace(lamb_min,lamb_max,200)
         d_list=np.linspace(d_vac_min,d_vac_max,200)
         for i in range(len(d_list)):
-            I_laser=np.abs(self.lam_E_ges(532e-9,*n_lists,d_list[i]))**2*np.ones(len(lamb_list))
-            I_emission=np.abs(self.lam_E_ges(lamb_list,*n_lists,d_list[i]))**2            
+            I_laser=np.abs(self.lam_E_ges(532e-9,n_Al.get_n(532e-9),n_Au.get_n(532e-9),d_list[i]))**2*np.ones(len(lamb_list))
+            I_emission=np.abs(self.lam_E_ges(lamb_list,n_Al.get_n(lamb_list),n_Au.get_n(lamb_list),d_list[i]))**2            
             plt.scatter(1e9*lamb_list,1e9*d_list[i]*np.ones(len(lamb_list)),
                         c=I_laser*I_emission,
                         vmin=-0.5,vmax=4,cmap=cm.nipy_spectral)
@@ -250,17 +246,17 @@ class sympy_tmm():
         plt.ylim(1e9*min(d_list),1e9*max(d_list))
         plt.xlabel('wavelength in nm ')
         plt.ylabel('d in nm')
-        plt.title('optical enhancement factor (Photoluminescence)')
+        plt.title('optical enhancement factor')
         plt.show()
         
-    def plot_spectrum_modification_to_ax(self,ax,d=0,lamb_list=[],n_lists=(),d_vac_min=0,d_vac_max=2300e-9):
+    def plot_spectrum_modification_to_ax(self,ax,d=d_SiO2+d_Al+d_MoS2/2,lamb_min=530e-9,lamb_max=870e-9,d_vac_min=0,d_vac_max=2300e-9):
             
         self.make_lam_E(d=d)
-        
+        lamb_list=np.linspace(lamb_min,lamb_max,200)
         d_list=np.linspace(d_vac_min,d_vac_max,200)
         for i in range(len(d_list)):
-            I_laser=np.abs(self.lam_E_ges(532e-9,*n_lists,d_list[i]))**2*np.ones(len(lamb_list))
-            I_emission=np.abs(self.lam_E_ges(lamb_list,*n_lists,d_list[i]))**2            
+            I_laser=np.abs(self.lam_E_ges(532e-9,n_Al.get_n(532e-9),n_Au.get_n(532e-9),d_list[i]))**2*np.ones(len(lamb_list))
+            I_emission=np.abs(self.lam_E_ges(lamb_list,n_Al.get_n(lamb_list),n_Au.get_n(lamb_list),d_list[i]))**2            
             ax.scatter(1e9*lamb_list,1e9*d_list[i]*np.ones(len(lamb_list)),
                         c=I_laser*I_emission,
                         vmin=0,vmax=5,cmap=cm.nipy_spectral)
@@ -272,12 +268,13 @@ class sympy_tmm():
         ax.set_title('simulated optical enhancement factor')
 
         
-    def plot_E_of_lamb(self,d_E=0,lamb_list=[],n_lists=(),d_vac=d_vac):
+    def plot_E_of_lamb(self,d=d_SiO2+d_Al+d_MoS2/2,lamb_min=530e-9,lamb_max=870e-9,d_vac=d_vac):
             
         
-        self.make_lam_E(d_E=d_E)
+        self.make_lam_E(d=d)
         print('d_value_list: ',self.d_value_list)
-        I_emission=np.abs(self.lam_E_ges(lamb_list,*n_lists,d_vac))**2
+        lamb_list=np.linspace(lamb_min,lamb_max,200)
+        I_emission=np.abs(self.lam_E_ges(lamb_list,n_Al.get_n(lamb_list),n_Au.get_n(lamb_list),d_vac))**2
         plt.plot(1e9*lamb_list,I_emission)
         plt.xlim(1e9*min(lamb_list),1e9*max(lamb_list))
         plt.show()
@@ -292,7 +289,9 @@ class sympy_tmm():
         plt.show()
         
     def E_of_d_vac(self,d_vac,lamb=532e-9):
-        return(self.lam_E_ges(lamb,n_graphene.get_n(lamb),n_Au.get_n(lamb),d_vac))
+        #if 'lam_E_ges' not in self.__dict__:
+        #    self.make_lam_E()
+        return(self.lam_E_ges(lamb,n_Al.get_n(lamb),n_Au.get_n(lamb),d_vac))
         
         
     def plot_E_of_d_vac(self,lamb=532e-9):
@@ -302,14 +301,11 @@ class sympy_tmm():
         plt.show()
 if __name__=='__main__':
     example_tmm=sympy_tmm()
-    lamb_list=np.linspace(530e-9,950e-9,200)
-    n_Au_list=n_Au.get_n(lamb_list)
-    n_graphene_list=n_graphene.get_n(lamb_list)
-    example_tmm.plot_R_T(lamb_list,d_vac=1000e-9,n_lists=(n_graphene_list,n_Au_list))
-    example_tmm.plot_E_of_lamb(lamb_list=lamb_list,d_vac=900e-9,n_lists=(n_graphene_list,n_Au_list))
+    example_tmm.plot_R_T(630e-9,970e-9,d_vac=10e-9)
+    #example_tmm.plot_E_of_lamb(d_vac=800e-9)
     example_tmm.make_lam_E()
     example_tmm.plot_E_of_d_vac()
-    example_tmm.plot_spectrum_modification(lamb_list,n_lists=(n_graphene_list,n_Au_list))
+    example_tmm.plot_spectrum_modification()
     #example_tmm.plot_E(d=d_SiO2+d_Al)
     #example_tmm.plot_R_T(600e-9,900e-9)
     #example_tmm.plot_R_d(600e-9,900e-9,100e-9,2500e-9)

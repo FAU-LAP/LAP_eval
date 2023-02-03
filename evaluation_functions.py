@@ -532,7 +532,7 @@ def distance_from_spec(lamb,intensity,calib_spec_path,return_dict=False,plot=Fal
     if(return_dict):
         func_vals=FabryPerot_min_max_theta_max(fit_dict['d'],I_min,I_max,F,lamb_normed,theta_max)
         print(func_vals)
-        return({'d':d,'lamb_normed':lamb_normed,'func_vals':func_vals})
+        return({'d':d,'lamb_normed':lamb_normed,'func_vals':func_vals,'I_normed':I_normed})
     else:            
         return(d)
 
