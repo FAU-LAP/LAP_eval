@@ -15,7 +15,7 @@ from sympy.utilities.lambdify import lambdify,implemented_function
 sp.init_printing()
 import timeit
 import sys
-import refractive_index.refractive_index as ri
+import refractive_index as ri
 
 n=sp.Symbol('n')
 l=sp.Symbol('l')

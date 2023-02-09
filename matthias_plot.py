@@ -14,9 +14,6 @@ import lmfit
 from lmfit import Model 
 from lmfit import Parameters
 import copy
-
-
-
 import load
 
 
@@ -61,6 +58,8 @@ def distance_from_spec(spec_path,calib_spec_path,plot=False,input_error=False,d_
     print(i_min_lamb,i_max_lamb,i_min_lamb_calib,i_max_lamb_calib)
     
     I_normed=intensity[i_min_lamb:i_max_lamb]/intensity_calib[i_min_lamb_calib:i_max_lamb_calib]
+    # Remove this line to not norm to 0.7 any more!!!!#
+    I_normed=I_normed/np.max(I_normed)*0.7
     lamb_normed=lamb[i_min_lamb:i_max_lamb]
     if(plot):
         ax3.plot(lamb_normed,I_normed)
@@ -120,12 +119,12 @@ def distance_from_spec(spec_path,calib_spec_path,plot=False,input_error=False,d_
             
     params=Parameters()
     if d_fit_min=='none':
-        d_fit_min=d-500
+        d_fit_min=d-5
     if d_fit_max=='none':
-        d_fit_max=d+500
+        d_fit_max=d+5
         
-    params.add('d',d,min=d_fit_min,max=d_fit_max,brute_step=20)
-    params.add('d2',500,min=480,max=520)
+    params.add('d',d,min=d_fit_min,max=d_fit_max,brute_step=20, vary=True)
+    params.add('d2',600,min=559,max=601, vary=True)
     print('d_start' , d)
     I_min=np.percentile(I_normed,5)
     I_max=np.percentile(I_normed,95)
@@ -138,6 +137,7 @@ def distance_from_spec(spec_path,calib_spec_path,plot=False,input_error=False,d_
     
     def cost_function_fit(lamb_list,I_list,I_min,I_max,F,params=params):
         def fun(pars):
+            # print(lamb_list)
             parvals = pars.valuesdict()
             d=parvals['d']
             d2=parvals['d2']
@@ -148,7 +148,7 @@ def distance_from_spec(spec_path,calib_spec_path,plot=False,input_error=False,d_
                 ret=np.array((function(d*1e-9,d2*1e-9,lamb_list*1e-9,)-I_list)**2,dtype=float)
            
             return(ret)
-        brute_result=lmfit.minimize(fun,params,method='brute')
+        brute_result=lmfit.minimize(fun,params,method='brute',)
         best_result=copy.deepcopy(brute_result)
         for candidate in brute_result.candidates[0:5]:
             trial = lmfit.minimize(fun, params=candidate.params,method='leastsq')
@@ -167,7 +167,7 @@ def distance_from_spec(spec_path,calib_spec_path,plot=False,input_error=False,d_
         if(input_error):
             ax3.set_title('Input error: Spectrum of test data: d= '+'{d:.0f} nm'.format(d=d),color='red')
         else:
-            ax3.set_title('calibrated spectrum: d= '+'{d:.0f} nm'.format(d=d))
+            ax3.set_title(f'calibrated spectrum: {d=:.0f}, {d2=:.0f}')
         
             
         
@@ -181,8 +181,7 @@ def distance_from_spec(spec_path,calib_spec_path,plot=False,input_error=False,d_
             ax3.plot(lamb_normed,FabryPerot_min_max(fit_dict['d'],I_min,I_max,F,lamb_normed))
         else:
             ax3.plot(lamb_normed,function(d*1e-9, d2*1e-9, lamb_normed*1e-9))
-    fig.savefig(f'plots/{spec_path}_fits_plot.png')
-    plt.close()
+        #fig.savefig(f'{os.path.dirname(spec_path)}\\plots\\{os.path.basename(spec_path)}_fits_plot.png')
       
             
     if plot:

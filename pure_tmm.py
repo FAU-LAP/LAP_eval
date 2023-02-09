@@ -32,24 +32,22 @@ def plot_spec(wavelengths, d_mem, d_vac, ax):
 
 
 
-def tmm_fit(params, wavelengths, measured_intensity, parallel):
+def tmm_fit(params, wavelengths, measured_intensity):
     def optimization_fun(pars):
         parvals = pars.valuesdict()
         d_mem = parvals['d_mem']
         d_vac = parvals['d_vac']
         amplitude = parvals['amplitude']
         reflectivity = []
-        parallel_result = parallel(
-                delayed(get_tmm_coh)(wavelength, d_mem, d_vac) for wavelength in
-                wavelengths)
-
-        reflectivity = np.array(parallel_result, dtype=float)*amplitude
+        for wavelength in wavelengths:
+            result = tmm.coh_tmm('s', [1, 2.6, 1, 2.6], [np.inf, d_mem, d_vac, np.inf],
+            # result=tmm.coh_tmm('s', [1, 1.5, 1, 2.6, 1, 2.6], [np.inf, 0.5e-3, 6e-3, d_mem, d_vac, np.inf],
+                                 th_0=0, lam_vac=wavelength)
+            reflectivity.append(result['R'])
+        reflectivity = np.array(reflectivity)*amplitude
         return np.array((reflectivity-measured_intensity)**2, dtype=float)
     fit = lmfit.minimize(optimization_fun, params)
     return fit.params.valuesdict()
-
-def get_tmm_coh(wavelength,d_mem, d_vac):
-    return tmm.coh_tmm('s', [1, 2.6, 1, 2.6], [np.inf, d_mem, d_vac, np.inf], th_0=0, lam_vac=wavelength)['R']
 
 lamb, intensity=np.loadtxt(r'\\confocal2\Measurement_Data\Morris\FP_morris\PN-27\cantilever_2023-02-08\Q4_16x6um_17-41-42\spec_fabry_x0.45_y0.15.txt',skiprows=4,unpack=True)
 intensity=intensity-340
@@ -80,7 +78,7 @@ params.add('d_mem',565,min=450,max=650, vary=True)
 params.add('d_vac',1440,min=1000,max=1500, vary=True)
 params.add('amplitude',1,min=0.1,max=1.2, vary=True)
 
-fit_result = tmm_fit(params, lamb_normed, I_normed, Parallel(n_jobs=3))
+fit_result = tmm_fit(params, lamb_normed, I_normed,)
 print(fit_result)
 fig, ax = plt.subplots(1)
 ax.plot(lamb_normed,I_normed)
